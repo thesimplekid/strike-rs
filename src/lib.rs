@@ -6,14 +6,17 @@
 
 use std::str::FromStr;
 
-use anyhow::Result;
-pub use invoice::*;
+use anyhow::{bail, Result};
 use reqwest::{Client, Url};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 
 pub mod invoice;
 pub mod pay_ln;
+pub mod webhooks;
+
+pub use invoice::*;
+pub use pay_ln::*;
 
 /// Strike
 #[derive(Debug, Clone)]
@@ -59,6 +62,14 @@ impl Amount {
         Self {
             currency: Currency::BTC,
             amount: amount as f64 / 100_000_000.0,
+        }
+    }
+
+    /// Unit as sats
+    pub fn to_sats(&self) -> Result<u64> {
+        match self.currency {
+            Currency::BTC => Ok((self.amount * 100_000_000.0) as u64),
+            _ => bail!("Unit cannot be converted to sats"),
         }
     }
 }
