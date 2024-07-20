@@ -1,14 +1,204 @@
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
+//! Strike API SDK
+//! Rust SDK for <https://strike.me/>
+#![doc = include_str!("../README.md")]
+#![warn(missing_docs)]
+#![warn(rustdoc::bare_urls)]
+
+use std::str::FromStr;
+
+use anyhow::Result;
+pub use invoice::*;
+use reqwest::{Client, Url};
+use serde::{Deserialize, Deserializer, Serialize};
+use serde_json::Value;
+
+pub mod invoice;
+pub mod pay_ln;
+
+/// Strike
+#[derive(Debug, Clone)]
+pub struct Strike {
+    api_key: String,
+    base_url: Url,
+    client: Client,
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+/// Currency unit
+#[derive(Debug, Clone, Hash, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "UPPERCASE")]
+pub enum Currency {
+    /// USD
+    USD,
+    /// EURO
+    EUR,
+    /// Bitcoin
+    BTC,
+}
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
+/// Amount with unit
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct Amount {
+    /// Currency of amount
+    pub currency: Currency,
+    /// Value of amount
+    #[serde(deserialize_with = "parse_f64_from_string")]
+    pub amount: f64,
+}
+
+fn parse_f64_from_string<'de, D>(deserializer: D) -> Result<f64, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s: String = Deserialize::deserialize(deserializer)?;
+    s.parse::<f64>().map_err(serde::de::Error::custom)
+}
+
+impl Amount {
+    /// Amount from sats
+    pub fn from_sats(amount: u64) -> Self {
+        Self {
+            currency: Currency::BTC,
+            amount: amount as f64 / 100_000_000.0,
+        }
     }
+}
+
+/// Invoice state
+#[derive(Debug, Clone, Hash, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "UPPERCASE")]
+pub enum InvoiceState {
+    /// Payment Completed
+    Completed,
+    /// Invoice paid
+    Paid,
+    /// Invoice unpaid
+    Unpaid,
+    /// Invoice pending
+    Pending,
+}
+
+/// Conversion rate for quote
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct ConversionRate {
+    /// Amount
+    #[serde(deserialize_with = "parse_f64_from_string")]
+    pub amount: f64,
+    /// Source Unit
+    #[serde(rename = "sourceCurrency")]
+    pub source_currency: Currency,
+    /// Target Unit
+    #[serde(rename = "targetCurrency")]
+    pub target_currency: Currency,
+}
+
+impl Strike {
+    /// Create Strike client
+    /// # Arguments
+    /// * `api_key` - Strike api token
+    /// * `url` - Optional Url of nodeless api
+    ///
+    /// # Example
+    /// ```
+    /// use strike_rs::Strike;
+    /// let client = Strike::new("xxxxxxxxxxx", None).unwrap();
+    /// ```
+    pub fn new(api_key: &str, api_url: Option<String>) -> Result<Self> {
+        let base_url = match api_url {
+            Some(url) => Url::from_str(&url)?,
+            None => Url::from_str("https://api.strike.me")?,
+        };
+
+        let client = reqwest::Client::builder().build()?;
+
+        Ok(Self {
+            api_key: api_key.to_string(),
+            base_url,
+            client,
+        })
+    }
+
+    async fn make_get(&self, url: Url) -> Result<Value> {
+        Ok(self
+            .client
+            .get(url)
+            .header("Authorization", format!("Bearer {}", self.api_key))
+            .header("Content-Type", "application/json")
+            .header("accept", "application/json")
+            .send()
+            .await?
+            .json::<Value>()
+            .await?)
+    }
+
+    async fn make_post(&self, url: Url, data: Option<Value>) -> Result<Value> {
+        let value = match data {
+            Some(data) => {
+                self.client
+                    .post(url)
+                    .header("Authorization", format!("Bearer {}", self.api_key))
+                    .header("Content-Type", "application/json")
+                    .header("accept", "application/json")
+                    .json(&data)
+                    .send()
+                    .await?
+                    .json::<Value>()
+                    .await?
+            }
+            None => {
+                self.client
+                    .post(url)
+                    .header("Authorization", format!("Bearer {}", self.api_key))
+                    .header("Content-Length", "0")
+                    .header("accept", "application/json")
+                    .send()
+                    .await?
+                    .json::<Value>()
+                    .await?
+            }
+        };
+        Ok(value)
+    }
+
+    async fn make_patch(&self, url: Url) -> Result<Value> {
+        Ok(self
+            .client
+            .patch(url)
+            .header("Authorization", format!("Bearer {}", self.api_key))
+            .header("Content-Length", "0")
+            .header("accept", "application/json")
+            .send()
+            .await?
+            .json::<Value>()
+            .await?)
+    }
+
+    /*
+    async fn make_put(&self, url: Url, data: Option<Value>) -> Result<Value> {
+        let res = self
+            .client
+            .put(url)
+            .header("Authorization", format!("Bearer {}", self.api_key))
+            .header("Content-Type", "application/json")
+            .header("accept", "application/json")
+            .json(&data)
+            .send()
+            .await?;
+        let res = res.json::<Value>().await?;
+        Ok(res)
+    }
+
+    async fn make_delete(&self, url: Url) -> Result<Value> {
+        let res = self
+            .client
+            .delete(url)
+            .header("Authorization", format!("Bearer {}", self.api_key))
+            .header("Content-Type", "application/json")
+            .header("accept", "application/json")
+            .send()
+            .await?;
+
+        let res = res.json::<Value>().await?;
+        Ok(res)
+    }
+    */
 }
