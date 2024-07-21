@@ -25,7 +25,7 @@ async fn main() {
     println!("{:?}", invoice);
 
     let quote = strike
-        .invoice_quote(create_invoice.invoice_id.clone())
+        .invoice_quote(&create_invoice.invoice_id.clone())
         .await
         .unwrap();
 

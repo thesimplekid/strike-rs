@@ -11,6 +11,7 @@ use reqwest::{Client, Url};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 
+pub(crate) mod hex;
 pub mod invoice;
 pub mod pay_ln;
 pub mod webhooks;

@@ -75,7 +75,7 @@ impl Strike {
 
     /// Find Invoice
     pub async fn find_invoice(&self, invoice_id: &str) -> Result<InvoiceResponse> {
-        let url = self.base_url.join("/v1/invoices/")?.join(&invoice_id)?;
+        let url = self.base_url.join("/v1/invoices/")?.join(invoice_id)?;
 
         let res = self.make_get(url).await?;
 
@@ -83,7 +83,7 @@ impl Strike {
     }
 
     /// Invoice quote
-    pub async fn invoice_quote(&self, invoice_id: String) -> Result<InvoiceQuoteResponse> {
+    pub async fn invoice_quote(&self, invoice_id: &str) -> Result<InvoiceQuoteResponse> {
         let url = self
             .base_url
             .join(&format!("/v1/invoices/{invoice_id}/quote"))?;

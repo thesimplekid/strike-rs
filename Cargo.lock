@@ -864,6 +864,7 @@ dependencies = [
  "log",
  "rand",
  "reqwest",
+ "ring",
  "serde",
  "serde_json",
  "tokio",
