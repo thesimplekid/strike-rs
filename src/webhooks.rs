@@ -19,14 +19,12 @@ pub struct WebhookState {
 
 /// Webhook data
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WebhookRequest {
-    #[serde(rename = "webhookUrl")]
     webhook_url: String,
-    #[serde(rename = "webhookVersion")]
     webhook_version: String,
     secret: String,
     enabled: bool,
-    #[serde(rename = "eventTypes")]
     event_types: Vec<String>,
 }
 
@@ -72,9 +70,9 @@ impl Strike {
 
 /// Webhook data
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WebHookData {
     /// Entity Id
-    #[serde(rename = "entityId")]
     entity_id: String,
     /// Changes
     changes: Vec<String>,
@@ -82,21 +80,19 @@ pub struct WebHookData {
 
 /// Webhook Response
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct WebHookResponse {
     /// Webhook id
     id: String,
     /// Event type
-    #[serde(rename = "eventType")]
     event_type: String,
     /// Webhook version
-    #[serde(rename = "webhookVersion")]
     webhook_version: String,
     /// Webhook data
     data: WebHookData,
     /// Created
     created: String,
     /// Delivery Success
-    #[serde(rename = "deliverySuccess")]
     delivery_success: bool,
 }
 

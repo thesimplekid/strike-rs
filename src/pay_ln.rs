@@ -7,59 +7,51 @@ use crate::{Amount, ConversionRate, Currency, InvoiceState, Strike};
 
 /// Pay Invoice Request
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PayInvoiceQuoteRequest {
     /// Bolt11 Invoice
-    #[serde(rename = "lnInvoice")]
     pub ln_invoice: String,
     /// Source Currency
-    #[serde(rename = "sourceCurrency")]
     pub source_currency: Currency,
 }
 
 /// Pay Invoice Response
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PayInvoiceQuoteResponse {
     /// Payment quote Id
-    #[serde(rename = "paymentQuoteId")]
     pub payment_quote_id: String,
     /// Description
     pub description: String,
     /// Quote valid till
-    #[serde(rename = "validUntil")]
     pub valid_until: String,
     /// Conversion quote
-    #[serde(rename = "conversionRate")]
     pub conversion_rate: Option<ConversionRate>,
     /// Amount
     pub amount: Amount,
     /// Network fee
-    #[serde(rename = "lightningNetworkFee")]
     pub lightning_network_fee: Amount,
     /// Total amount including fee
-    #[serde(rename = "totalAmount")]
     pub total_amount: Amount,
 }
 
 /// Pay Quote Response
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct InvoicePaymentResponse {
     /// Payment id
-    #[serde(rename = "paymentId")]
     pub payment_id: String,
     /// Invoice state
     pub state: InvoiceState,
     /// Completed time stamp
     pub completed: Option<String>,
     /// Conversion quote
-    #[serde(rename = "conversionRate")]
     pub conversion_rate: Option<ConversionRate>,
     /// Amount
     pub amount: Amount,
     /// Network fee
-    #[serde(rename = "lightningNetworkFee")]
     pub lightning_network_fee: Amount,
     /// Total amount including fee
-    #[serde(rename = "totalAmount")]
     pub total_amount: Amount,
 }
 

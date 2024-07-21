@@ -7,9 +7,9 @@ use crate::{Amount, ConversionRate, InvoiceState, Strike};
 
 /// Invoice Request
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct InvoiceRequest {
     /// Correlation ID
-    #[serde(rename = "correlationId")]
     pub correlation_id: Option<String>,
     /// Invoice description
     pub description: Option<String>,
@@ -19,9 +19,9 @@ pub struct InvoiceRequest {
 
 /// Invoice Response
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct InvoiceResponse {
     /// Invoice ID
-    #[serde(rename = "invoiceId")]
     pub invoice_id: String,
     /// Invoice [`Amount`]
     pub amount: Amount,
@@ -32,40 +32,32 @@ pub struct InvoiceResponse {
     /// Invoice Description
     pub description: Option<String>,
     /// Isser ID
-    #[serde(rename = "issuerId")]
     pub issuer_id: String,
     /// Receiver ID
-    #[serde(rename = "receiverId")]
     pub receiver_id: String,
 }
 
 /// Invoice Response
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct InvoiceQuoteResponse {
     /// Invoice Quote ID
-    #[serde(rename = "quoteId")]
     pub quote_id: String,
     /// Invoice description
     pub description: Option<String>,
     /// Bolt11 invoice
-    #[serde(rename = "lnInvoice")]
     pub ln_invoice: String,
     /// Onchain Address
-    #[serde(rename = "onchainAddress")]
     pub onchain_address: Option<String>,
     /// Expiration of quote
     pub expiration: String,
     /// Experition in secs
-    #[serde(rename = "expirationInSec")]
     pub expiration_in_sec: u64,
     /// Source Amount
-    #[serde(rename = "sourceAmount")]
     pub source_amount: Amount,
-    #[serde(rename = "targetAmount")]
     /// Target Amount
     pub target_amount: Amount,
     /// Conversion Rate
-    #[serde(rename = "conversionRate")]
     pub conversion_rate: ConversionRate,
 }
 
