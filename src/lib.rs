@@ -7,6 +7,8 @@
 use std::str::FromStr;
 
 use anyhow::{bail, Result};
+use rand::distributions::Alphanumeric;
+use rand::Rng;
 use reqwest::{Client, Url};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
@@ -25,6 +27,7 @@ pub struct Strike {
     api_key: String,
     base_url: Url,
     client: Client,
+    webhook_secret: String,
 }
 
 /// Currency unit
@@ -121,11 +124,17 @@ impl Strike {
         };
 
         let client = reqwest::Client::builder().build()?;
+        let secret: String = rand::thread_rng()
+            .sample_iter(&Alphanumeric)
+            .take(15)
+            .map(char::from)
+            .collect();
 
         Ok(Self {
             api_key: api_key.to_string(),
             base_url,
             client,
+            webhook_secret: secret,
         })
     }
 

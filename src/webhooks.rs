@@ -4,8 +4,6 @@ use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode};
 use axum::routing::post;
 use axum::{Json, Router};
-use rand::distributions::Alphanumeric;
-use rand::Rng;
 use ring::hmac;
 use serde::{Deserialize, Serialize};
 
@@ -31,41 +29,42 @@ pub struct WebhookRequest {
 
 impl Strike {
     /// Create invoice webhook
-    pub async fn create_invoice_webhook(
+    pub async fn create_invoice_webhook_router(
         &self,
-        base_url: &str,
         webhook_endpoint: &str,
         sender: tokio::sync::mpsc::Sender<String>,
     ) -> anyhow::Result<Router> {
-        let url = self.base_url.join("/v1/subscriptions")?;
-
-        let secret: String = rand::thread_rng()
-            .sample_iter(&Alphanumeric)
-            .take(15)
-            .map(char::from)
-            .collect();
-
         let state = WebhookState {
             sender,
-            webhook_secret: secret.clone(),
+            webhook_secret: self.webhook_secret.clone(),
         };
 
         let router = Router::new()
             .route(webhook_endpoint, post(handle_invoice))
             .with_state(state);
 
+        Ok(router)
+    }
+
+    /// Subscribe to invoice webhook
+    pub async fn subscribe_to_invoice_webhook(&self, webhook_url: String) -> anyhow::Result<()> {
+        let url = self.base_url.join("/v1/subscriptions")?;
+
         let subscription = WebhookRequest {
-            webhook_url: format!("{}{}", base_url, webhook_endpoint),
+            webhook_url,
             webhook_version: "v1".to_string(),
-            secret,
+            secret: self.webhook_secret.clone(),
             enabled: true,
             event_types: vec!["invoice.updated".to_string()],
         };
 
-        self.make_post(url, Some(serde_json::to_value(subscription)?))
+        let res = self
+            .make_post(url, Some(serde_json::to_value(subscription)?))
             .await?;
 
-        Ok(router)
+        log::debug!("Webhook subscription: {}", res);
+
+        Ok(())
     }
 }
 
