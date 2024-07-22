@@ -1,7 +1,7 @@
-//! Create webhook
+//! Strike Webhooks
 
 use anyhow::anyhow;
-use axum::body::{Body, Bytes};
+use axum::body::Body;
 use axum::extract::{Request, State};
 use axum::http::StatusCode;
 use axum::middleware::{self, Next};
@@ -9,7 +9,7 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::post;
 use axum::{Json, Router};
 use http_body_util::BodyExt;
-use ring::hmac;
+use ring::hmac::{self, Key};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -112,7 +112,7 @@ impl Strike {
     }
 
     /// Delete subscription
-    pub async fn delete_subscription(&self, webhook_id: String) -> anyhow::Result<()> {
+    pub async fn delete_subscription(&self, webhook_id: &str) -> anyhow::Result<()> {
         let url = self
             .base_url
             .join(&format!("/v1/subscriptions/{}", webhook_id))?;
@@ -158,20 +158,11 @@ async fn buffer_request_body(request: Request, secret: &str) -> Result<Request, 
             StatusCode::UNAUTHORIZED.into_response()
         })?;
 
-    verify_hmac_signature(&bytes, secret, signature)
+    verify_request_signature(signature, &bytes, secret.as_bytes())
         .map_err(|_| StatusCode::UNAUTHORIZED)
         .into_response();
 
     Ok(Request::from_parts(parts, Body::from(bytes)))
-}
-
-fn verify_hmac_signature(bytes: &Bytes, secret: &str, signature: &str) -> Result<(), StatusCode> {
-    let string = String::from_utf8(bytes.to_vec()).map_err(|_| StatusCode::UNPROCESSABLE_ENTITY)?;
-
-    verify_request_signature(signature, &string, secret.as_bytes())
-        .map_err(|_| StatusCode::UNAUTHORIZED)?;
-
-    Ok(())
 }
 
 /// Webhook data
@@ -201,23 +192,23 @@ struct WebHookResponse {
     /// Delivery Success
     delivery_success: Option<bool>,
 }
-
 // Function to compute HMAC SHA-256
-fn compute_hmac(content: &[u8], secret: &[u8]) -> String {
-    let key = hmac::Key::new(hmac::HMAC_SHA256, secret);
-    let tag = hmac::sign(&key, content);
+fn compute_hmac(content: &[u8], key: &Key) -> String {
+    let tag = hmac::sign(key, content);
     hex::encode(tag.as_ref())
 }
 
 // Function to verify request signature
 fn verify_request_signature(
     request_signature: &str,
-    body: &str,
+    body: &[u8],
     secret: &[u8],
 ) -> anyhow::Result<()> {
-    let content_signature = compute_hmac(body.as_bytes(), secret);
+    let key = hmac::Key::new(hmac::HMAC_SHA256, secret);
+
+    let content_signature = compute_hmac(body, &key);
     hmac::verify(
-        &hmac::Key::new(hmac::HMAC_SHA256, secret),
+        &key,
         request_signature.as_bytes(),
         content_signature.as_bytes(),
     )
@@ -232,8 +223,11 @@ async fn handle_invoice(
     State(state): State<WebhookState>,
     Json(payload): Json<Value>,
 ) -> Result<StatusCode, StatusCode> {
-    let webhook_response: WebHookResponse =
-        serde_json::from_value(payload).map_err(|_| StatusCode::UNPROCESSABLE_ENTITY)?;
+    let webhook_response: WebHookResponse = serde_json::from_value(payload).map_err(|_err| {
+        log::warn!("Got an invalid payload on webhook");
+
+        StatusCode::UNPROCESSABLE_ENTITY
+    })?;
 
     log::debug!(
         "Received webhook update for: {}",
