@@ -11,3 +11,6 @@
 ### Pay
 - [x] Get LN payment quote
 - [x] Execute LN Payment Quote
+
+### Webhook
+- [ ] Subscribe to invoice updated webhook

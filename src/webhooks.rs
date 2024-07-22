@@ -49,7 +49,7 @@ impl Strike {
             .route(webhook_endpoint, post(handle_invoice))
             .layer(middleware::from_fn_with_state(
                 state.clone(),
-                print_request_body,
+                verify_request_body,
             ))
             .with_state(state);
 
@@ -78,8 +78,8 @@ impl Strike {
     }
 }
 
-// middleware that shows how to consume the request body upfront
-async fn print_request_body(
+// middleware to consume the request body upfront
+async fn verify_request_body(
     State(state): State<WebhookState>,
     request: Request,
     next: Next,
@@ -89,8 +89,8 @@ async fn print_request_body(
     Ok(next.run(request).await)
 }
 
-// the trick is to take the request apart, buffer the body, do what you need to
-// do, then put the request back together
+// take the request apart, buffer the body,
+// veridy signature, then put the request back together
 async fn buffer_request_body(request: Request, secret: &str) -> Result<Request, Response> {
     let (parts, body) = request.into_parts();
 
@@ -105,24 +105,24 @@ async fn buffer_request_body(request: Request, secret: &str) -> Result<Request, 
 
     let signature = headers
         .get("X-Webhook-Signature")
-        .ok_or(StatusCode::UNAUTHORIZED)
-        .unwrap()
+        .ok_or_else(|| {
+            log::warn!("Post to webhook did not include signature");
+            StatusCode::UNAUTHORIZED.into_response()
+        })?
         .to_str()
-        .map_err(|_| StatusCode::UNAUTHORIZED.into_response())?;
-    log::trace!("Got signature on request body");
+        .map_err(|_| {
+            log::warn!("Webhook signature is not a valid string");
+            StatusCode::UNAUTHORIZED.into_response()
+        })?;
 
-    do_thing_with_request_body(&bytes, secret, signature)
+    verify_hmac_signature(&bytes, secret, signature)
         .map_err(|_| StatusCode::UNAUTHORIZED)
         .into_response();
 
     Ok(Request::from_parts(parts, Body::from(bytes)))
 }
 
-fn do_thing_with_request_body(
-    bytes: &Bytes,
-    secret: &str,
-    signature: &str,
-) -> Result<(), StatusCode> {
+fn verify_hmac_signature(bytes: &Bytes, secret: &str, signature: &str) -> Result<(), StatusCode> {
     let string = String::from_utf8(bytes.to_vec()).map_err(|_| StatusCode::UNPROCESSABLE_ENTITY)?;
 
     verify_request_signature(signature, &string, secret.as_bytes())
@@ -178,20 +178,17 @@ fn verify_request_signature(
         request_signature.as_bytes(),
         content_signature.as_bytes(),
     )
-    .map_err(|_| anyhow!("Invalid signature"))?)
+    .map_err(|_| {
+        log::warn!("Request did not have a valid signature");
+
+        anyhow!("Invalid signature")
+    })?)
 }
 
 async fn handle_invoice(
     State(state): State<WebhookState>,
     Json(payload): Json<Value>,
 ) -> Result<StatusCode, StatusCode> {
-    /*
-    let signature = headers
-        .get("X-Webhook-Signature")
-        .ok_or(StatusCode::UNAUTHORIZED)?
-        .to_str()
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    */
     let webhook_response: WebHookResponse =
         serde_json::from_value(payload).map_err(|_| StatusCode::UNPROCESSABLE_ENTITY)?;
 
@@ -199,14 +196,6 @@ async fn handle_invoice(
         "Received webhook update for: {}",
         webhook_response.data.entity_id
     );
-
-    //let secret = state.webhook_secret;
-    /*
-    if let Err(_err) = verify_request_signature(signature, &payload, secret.as_bytes()) {
-        log::warn!("Signature verification failed");
-        return Err(StatusCode::UNAUTHORIZED);
-    }
-    */
 
     if let Err(err) = state.sender.send(webhook_response.data.entity_id).await {
         log::warn!("Could not send on channel: {}", err);
