@@ -2,6 +2,12 @@
 name = "strike-rs"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+authors = ["thesimplekid <tsk@thesimplekid.com>"]
+description = "Strike API SDK"
+homepage = "https://github.com/thesimplekid/strike-rs"
+repository = "https://github.com/thesimplekid/strike-rs"
+rust-version = "1.70.0" # MSRV
 
 [dependencies]
 anyhow = "1"
