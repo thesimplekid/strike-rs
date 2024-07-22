@@ -103,19 +103,9 @@ fn compute_hmac(content: &[u8], secret: &[u8]) -> String {
     hex::encode(tag.as_ref())
 }
 
-// Function to get raw body as bytes
-fn get_raw_body<T: serde::Serialize>(body: &T) -> Vec<u8> {
-    let json_str = serde_json::to_string(body).expect("Failed to serialize body to JSON");
-    json_str.into_bytes()
-}
-
 // Function to verify request signature
-fn verify_request_signature<T: serde::Serialize>(
-    request_signature: &str,
-    body: &T,
-    secret: &[u8],
-) -> bool {
-    let content_signature = compute_hmac(&get_raw_body(body), secret);
+fn verify_request_signature(request_signature: &str, body: &str, secret: &[u8]) -> bool {
+    let content_signature = compute_hmac(body.as_bytes(), secret);
     hmac::verify(
         &hmac::Key::new(hmac::HMAC_SHA256, secret),
         request_signature.as_bytes(),
@@ -127,20 +117,28 @@ fn verify_request_signature<T: serde::Serialize>(
 async fn handle_invoice(
     headers: HeaderMap,
     State(state): State<WebhookState>,
-    Json(payload): Json<WebHookResponse>,
+    Json(payload): Json<String>,
 ) -> Result<StatusCode, StatusCode> {
     let signature = headers
         .get("X-Webhook-Signature")
         .ok_or(StatusCode::UNAUTHORIZED)?
         .to_str()
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let webhook_response: WebHookResponse =
+        serde_json::from_str(&payload).map_err(|_| StatusCode::UNPROCESSABLE_ENTITY)?;
+
+    log::debug!(
+        "Received webhook update for: {}",
+        webhook_response.data.entity_id
+    );
 
     let secret = state.webhook_secret;
     if !verify_request_signature(signature, &payload, secret.as_bytes()) {
+        log::warn!("Signature verification failed");
         return Err(StatusCode::UNAUTHORIZED);
     }
 
-    if let Err(err) = state.sender.send(payload.data.entity_id).await {
+    if let Err(err) = state.sender.send(webhook_response.data.entity_id).await {
         log::warn!("Could not send on channel: {}", err);
     }
     Ok(StatusCode::OK)
