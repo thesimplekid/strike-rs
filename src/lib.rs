@@ -193,6 +193,18 @@ impl Strike {
             .await?)
     }
 
+    async fn make_delete(&self, url: Url) -> Result<Value> {
+        let res = self
+            .client
+            .delete(url)
+            .header("Authorization", format!("Bearer {}", self.api_key))
+            .send()
+            .await?;
+
+        let res = res.json::<Value>().await?;
+        Ok(res)
+    }
+
     /*
     async fn make_put(&self, url: Url, data: Option<Value>) -> Result<Value> {
         let res = self
@@ -208,18 +220,5 @@ impl Strike {
         Ok(res)
     }
 
-    async fn make_delete(&self, url: Url) -> Result<Value> {
-        let res = self
-            .client
-            .delete(url)
-            .header("Authorization", format!("Bearer {}", self.api_key))
-            .header("Content-Type", "application/json")
-            .header("accept", "application/json")
-            .send()
-            .await?;
-
-        let res = res.json::<Value>().await?;
-        Ok(res)
-    }
     */
 }

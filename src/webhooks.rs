@@ -18,19 +18,42 @@ use crate::{hex, Strike};
 /// Webhook state
 #[derive(Debug, Clone)]
 pub struct WebhookState {
-    webhook_secret: String,
-    sender: tokio::sync::mpsc::Sender<String>,
+    /// Webhook secret
+    pub webhook_secret: String,
+    /// Sender
+    pub sender: tokio::sync::mpsc::Sender<String>,
 }
 
 /// Webhook data
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WebhookRequest {
-    webhook_url: String,
-    webhook_version: String,
-    secret: String,
-    enabled: bool,
-    event_types: Vec<String>,
+    /// Webhook url
+    pub webhook_url: String,
+    /// Webhook version
+    pub webhook_version: String,
+    /// Secret
+    pub secret: String,
+    /// Enabled
+    pub enabled: bool,
+    /// Event Types
+    pub event_types: Vec<String>,
+}
+
+/// Webhook response
+#[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WebhookInfoResponse {
+    /// Webhook id
+    pub id: String,
+    /// Webhook url
+    pub webhook_url: String,
+    /// Webhook Version
+    pub webhook_version: String,
+    /// Enabled
+    pub enabled: bool,
+    /// Event types
+    pub event_types: Vec<String>,
 }
 
 impl Strike {
@@ -73,6 +96,28 @@ impl Strike {
             .await?;
 
         log::debug!("Webhook subscription: {}", res);
+
+        Ok(())
+    }
+
+    /// Get current subscriptions
+    pub async fn get_current_subscriptions(&self) -> anyhow::Result<Vec<WebhookInfoResponse>> {
+        let url = self.base_url.join("/v1/subscriptions")?;
+
+        let res = self.make_get(url).await?;
+
+        let webhooks: Vec<WebhookInfoResponse> = serde_json::from_value(res)?;
+
+        Ok(webhooks)
+    }
+
+    /// Delete subscription
+    pub async fn delete_subscription(&self, webhook_id: String) -> anyhow::Result<()> {
+        let url = self
+            .base_url
+            .join(&format!("/v1/subscriptions/{}", webhook_id))?;
+
+        let _ = self.make_delete(url).await?;
 
         Ok(())
     }
@@ -173,7 +218,7 @@ fn verify_request_signature(
     secret: &[u8],
 ) -> anyhow::Result<()> {
     let content_signature = compute_hmac(body.as_bytes(), secret);
-    Ok(hmac::verify(
+    hmac::verify(
         &hmac::Key::new(hmac::HMAC_SHA256, secret),
         request_signature.as_bytes(),
         content_signature.as_bytes(),
@@ -182,7 +227,7 @@ fn verify_request_signature(
         log::warn!("Request did not have a valid signature");
 
         anyhow!("Invalid signature")
-    })?)
+    })
 }
 
 async fn handle_invoice(
