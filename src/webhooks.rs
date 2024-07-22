@@ -93,7 +93,7 @@ struct WebHookResponse {
     /// Created
     created: String,
     /// Delivery Success
-    delivery_success: bool,
+    delivery_success: Option<bool>,
 }
 
 // Function to compute HMAC SHA-256
