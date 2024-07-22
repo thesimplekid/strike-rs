@@ -1,15 +1,17 @@
 //! Create webhook
 
 use anyhow::anyhow;
-use async_trait::async_trait;
-use axum::body::Bytes;
-use axum::extract::{FromRef, FromRequest, Request, State};
-use axum::http::{HeaderMap, StatusCode};
+use axum::body::{Body, Bytes};
+use axum::extract::{Request, State};
+use axum::http::StatusCode;
+use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
 use axum::routing::post;
 use axum::{Json, Router};
+use http_body_util::BodyExt;
 use ring::hmac;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 use crate::{hex, Strike};
 
@@ -45,6 +47,10 @@ impl Strike {
 
         let router = Router::new()
             .route(webhook_endpoint, post(handle_invoice))
+            .layer(middleware::from_fn_with_state(
+                state.clone(),
+                print_request_body,
+            ))
             .with_state(state);
 
         Ok(router)
@@ -72,8 +78,48 @@ impl Strike {
     }
 }
 
+// middleware that shows how to consume the request body upfront
+async fn print_request_body(
+    State(state): State<WebhookState>,
+    request: Request,
+    next: Next,
+) -> Result<impl IntoResponse, Response> {
+    let request = buffer_request_body(request, &state.webhook_secret).await?;
+
+    Ok(next.run(request).await)
+}
+
+// the trick is to take the request apart, buffer the body, do what you need to
+// do, then put the request back together
+async fn buffer_request_body(request: Request, secret: &str) -> Result<Request, Response> {
+    let (parts, body) = request.into_parts();
+
+    // this wont work if the body is an long running stream
+    let bytes = body
+        .collect()
+        .await
+        .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response())?
+        .to_bytes();
+
+    let headers = parts.headers.clone();
+
+    let signature = headers
+        .get("X-Webhook-Signature")
+        .ok_or(StatusCode::UNAUTHORIZED)
+        .unwrap()
+        .to_str()
+        .map_err(|_| StatusCode::UNAUTHORIZED.into_response())?;
+    log::trace!("Got signature on request body");
+
+    do_thing_with_request_body(&bytes, secret, signature)
+        .map_err(|_| StatusCode::UNAUTHORIZED)
+        .into_response();
+
+    Ok(Request::from_parts(parts, Body::from(bytes)))
+}
+
 fn do_thing_with_request_body(
-    bytes: Bytes,
+    bytes: &Bytes,
     secret: &str,
     signature: &str,
 ) -> Result<(), StatusCode> {
@@ -83,40 +129,6 @@ fn do_thing_with_request_body(
         .map_err(|_| StatusCode::UNAUTHORIZED)?;
 
     Ok(())
-}
-
-// extractor that shows how to consume the request body upfront
-struct BufferRequestBody(Bytes);
-
-// we must implement `FromRequest` (and not `FromRequestParts`) to consume the
-// body
-#[async_trait]
-impl<S> FromRequest<S> for BufferRequestBody
-where
-    WebhookState: FromRef<S>,
-    S: Send + Sync,
-{
-    type Rejection = Response;
-
-    async fn from_request(req: Request, state: &S) -> Result<Self, Self::Rejection> {
-        let headers = req.headers().clone();
-
-        let body = Bytes::from_request(req, state)
-            .await
-            .map_err(|err| err.into_response())?;
-
-        let signature = headers
-            .get("X-Webhook-Signature")
-            .ok_or(Self::Rejection::default())?
-            .to_str()
-            .map_err(|_| Self::Rejection::default())?;
-
-        let state = WebhookState::from_ref(state);
-
-        do_thing_with_request_body(body.clone(), &state.webhook_secret, signature).unwrap();
-
-        Ok(Self(body))
-    }
 }
 
 /// Webhook data
@@ -170,28 +182,31 @@ fn verify_request_signature(
 }
 
 async fn handle_invoice(
-    headers: HeaderMap,
     State(state): State<WebhookState>,
-    Json(payload): Json<String>,
+    Json(payload): Json<Value>,
 ) -> Result<StatusCode, StatusCode> {
+    /*
     let signature = headers
         .get("X-Webhook-Signature")
         .ok_or(StatusCode::UNAUTHORIZED)?
         .to_str()
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    */
     let webhook_response: WebHookResponse =
-        serde_json::from_str(&payload).map_err(|_| StatusCode::UNPROCESSABLE_ENTITY)?;
+        serde_json::from_value(payload).map_err(|_| StatusCode::UNPROCESSABLE_ENTITY)?;
 
     log::debug!(
         "Received webhook update for: {}",
         webhook_response.data.entity_id
     );
 
-    let secret = state.webhook_secret;
+    //let secret = state.webhook_secret;
+    /*
     if let Err(_err) = verify_request_signature(signature, &payload, secret.as_bytes()) {
         log::warn!("Signature verification failed");
         return Err(StatusCode::UNAUTHORIZED);
     }
+    */
 
     if let Err(err) = state.sender.send(webhook_response.data.entity_id).await {
         log::warn!("Could not send on channel: {}", err);
