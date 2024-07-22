@@ -859,8 +859,10 @@ name = "strike-rs"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "axum",
  "dotenvy",
+ "http-body-util",
  "log",
  "rand",
  "reqwest",

@@ -1,7 +1,11 @@
 //! Create webhook
 
-use axum::extract::State;
+use anyhow::anyhow;
+use async_trait::async_trait;
+use axum::body::Bytes;
+use axum::extract::{FromRef, FromRequest, Request, State};
 use axum::http::{HeaderMap, StatusCode};
+use axum::response::{IntoResponse, Response};
 use axum::routing::post;
 use axum::{Json, Router};
 use ring::hmac;
@@ -68,6 +72,53 @@ impl Strike {
     }
 }
 
+fn do_thing_with_request_body(
+    bytes: Bytes,
+    secret: &str,
+    signature: &str,
+) -> Result<(), StatusCode> {
+    let string = String::from_utf8(bytes.to_vec()).map_err(|_| StatusCode::UNPROCESSABLE_ENTITY)?;
+
+    verify_request_signature(signature, &string, secret.as_bytes())
+        .map_err(|_| StatusCode::UNAUTHORIZED)?;
+
+    Ok(())
+}
+
+// extractor that shows how to consume the request body upfront
+struct BufferRequestBody(Bytes);
+
+// we must implement `FromRequest` (and not `FromRequestParts`) to consume the
+// body
+#[async_trait]
+impl<S> FromRequest<S> for BufferRequestBody
+where
+    WebhookState: FromRef<S>,
+    S: Send + Sync,
+{
+    type Rejection = Response;
+
+    async fn from_request(req: Request, state: &S) -> Result<Self, Self::Rejection> {
+        let headers = req.headers().clone();
+
+        let body = Bytes::from_request(req, state)
+            .await
+            .map_err(|err| err.into_response())?;
+
+        let signature = headers
+            .get("X-Webhook-Signature")
+            .ok_or(Self::Rejection::default())?
+            .to_str()
+            .map_err(|_| Self::Rejection::default())?;
+
+        let state = WebhookState::from_ref(state);
+
+        do_thing_with_request_body(body.clone(), &state.webhook_secret, signature).unwrap();
+
+        Ok(Self(body))
+    }
+}
+
 /// Webhook data
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -104,14 +155,18 @@ fn compute_hmac(content: &[u8], secret: &[u8]) -> String {
 }
 
 // Function to verify request signature
-fn verify_request_signature(request_signature: &str, body: &str, secret: &[u8]) -> bool {
+fn verify_request_signature(
+    request_signature: &str,
+    body: &str,
+    secret: &[u8],
+) -> anyhow::Result<()> {
     let content_signature = compute_hmac(body.as_bytes(), secret);
-    hmac::verify(
+    Ok(hmac::verify(
         &hmac::Key::new(hmac::HMAC_SHA256, secret),
         request_signature.as_bytes(),
         content_signature.as_bytes(),
     )
-    .is_ok()
+    .map_err(|_| anyhow!("Invalid signature"))?)
 }
 
 async fn handle_invoice(
@@ -133,7 +188,7 @@ async fn handle_invoice(
     );
 
     let secret = state.webhook_secret;
-    if !verify_request_signature(signature, &payload, secret.as_bytes()) {
+    if let Err(_err) = verify_request_signature(signature, &payload, secret.as_bytes()) {
         log::warn!("Signature verification failed");
         return Err(StatusCode::UNAUTHORIZED);
     }
