@@ -6,7 +6,7 @@
 
 use std::str::FromStr;
 
-use anyhow::{bail, Result};
+use anyhow::{anyhow, bail, Result};
 use rand::distributions::Alphanumeric;
 use rand::Rng;
 use reqwest::{Client, Url};
@@ -193,16 +193,15 @@ impl Strike {
             .await?)
     }
 
-    async fn make_delete(&self, url: Url) -> Result<Value> {
-        let res = self
-            .client
+    async fn make_delete(&self, url: Url) -> Result<()> {
+        self.client
             .delete(url)
             .header("Authorization", format!("Bearer {}", self.api_key))
             .send()
-            .await?;
+            .await
+            .map_err(|err| anyhow!("Error making delete: {}", err.to_string()))?;
 
-        let res = res.json::<Value>().await?;
-        Ok(res)
+        Ok(())
     }
 
     /*

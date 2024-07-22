@@ -117,9 +117,7 @@ impl Strike {
             .base_url
             .join(&format!("/v1/subscriptions/{}", webhook_id))?;
 
-        let _ = self.make_delete(url).await?;
-
-        Ok(())
+        self.make_delete(url).await
     }
 }
 
