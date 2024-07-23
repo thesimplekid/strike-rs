@@ -1,14 +1,13 @@
 //! Strike Webhooks
 
 use anyhow::anyhow;
-use axum::body::Body;
+use axum::body::{to_bytes, Body};
 use axum::extract::{Request, State};
 use axum::http::StatusCode;
 use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
 use axum::routing::post;
 use axum::{Json, Router};
-use http_body_util::BodyExt;
 use ring::hmac::{self, Key};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -137,12 +136,9 @@ async fn verify_request_body(
 async fn buffer_request_body(request: Request, secret: &str) -> Result<Request, Response> {
     let (parts, body) = request.into_parts();
 
-    // this wont work if the body is an long running stream
-    let bytes = body
-        .collect()
+    let bytes = to_bytes(body, usize::MAX)
         .await
-        .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response())?
-        .to_bytes();
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())?;
 
     let headers = parts.headers.clone();
 
