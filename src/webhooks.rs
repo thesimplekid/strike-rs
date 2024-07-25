@@ -189,9 +189,9 @@ struct WebHookResponse {
     delivery_success: Option<bool>,
 }
 // Function to compute HMAC SHA-256
-fn compute_hmac(content: &[u8], key: &Key) -> String {
+fn compute_hmac(content: &[u8], key: &Key) -> Vec<u8> {
     let tag = hmac::sign(key, content);
-    hex::encode(tag.as_ref())
+    tag.as_ref().to_vec()
 }
 
 // Function to verify request signature
@@ -202,11 +202,13 @@ fn verify_request_signature(
 ) -> anyhow::Result<()> {
     let key = hmac::Key::new(hmac::HMAC_SHA256, secret);
 
+    let body = serde_json::from_slice(body)?;
     let content_signature = compute_hmac(body, &key);
+
     hmac::verify(
         &key,
-        request_signature.as_bytes(),
-        content_signature.as_bytes(),
+        &hex::decode(request_signature).unwrap(),
+        &content_signature,
     )
     .map_err(|_| {
         log::warn!("Request did not have a valid signature");
