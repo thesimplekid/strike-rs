@@ -205,12 +205,7 @@ fn verify_request_signature(
     let body = serde_json::from_slice(body)?;
     let content_signature = compute_hmac(body, &key);
 
-    hmac::verify(
-        &key,
-        &hex::decode(request_signature).unwrap(),
-        &content_signature,
-    )
-    .map_err(|_| {
+    hmac::verify(&key, &hex::decode(request_signature)?, &content_signature).map_err(|_| {
         log::warn!("Request did not have a valid signature");
 
         anyhow!("Invalid signature")
