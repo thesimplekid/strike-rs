@@ -22,6 +22,10 @@
 -->
 
 
+## [0.2.2]
+### Changed
+- Remove use of unwrap ([thesimplekid]).
+
 ## [0.2.1]
 ### Fixed
 - Webhook signature verification ([thesimplekid]).
