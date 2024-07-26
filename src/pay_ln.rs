@@ -22,7 +22,7 @@ pub struct PayInvoiceQuoteResponse {
     /// Payment quote Id
     pub payment_quote_id: String,
     /// Description
-    pub description: String,
+    pub description: Option<String>,
     /// Quote valid till
     pub valid_until: String,
     /// Conversion quote
