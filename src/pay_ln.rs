@@ -1,6 +1,6 @@
 //! Pay Ln
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
 
 use crate::{Amount, ConversionRate, Currency, InvoiceState, Strike};
@@ -67,7 +67,14 @@ impl Strike {
             .make_post(url, Some(serde_json::to_value(quote_request)?))
             .await?;
 
-        Ok(serde_json::from_value(res)?)
+        match serde_json::from_value(res.clone()) {
+            Ok(res) => Ok(res),
+            Err(_) => {
+                log::error!("Api error response on payment quote");
+                log::error!("{}", res);
+                bail!("Could not get payment quote")
+            }
+        }
     }
 
     /// Execute quote to pay invoice
@@ -78,6 +85,13 @@ impl Strike {
 
         let res = self.make_patch(url).await?;
 
-        Ok(serde_json::from_value(res)?)
+        match serde_json::from_value(res.clone()) {
+            Ok(res) => Ok(res),
+            Err(_) => {
+                log::error!("Api error response on payment quote execution");
+                log::error!("{}", res);
+                bail!("Could not execute payment quote")
+            }
+        }
     }
 }

@@ -94,7 +94,7 @@ impl Strike {
             .make_post(url, Some(serde_json::to_value(subscription)?))
             .await?;
 
-        log::debug!("Webhook subscription: {}", res);
+        log::debug!("Created Webhook subscription: {}", res);
 
         Ok(())
     }

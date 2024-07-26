@@ -1,6 +1,6 @@
 //! Handle invoice creation
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
 
 use crate::{Amount, ConversionRate, InvoiceState, Strike};
@@ -70,7 +70,14 @@ impl Strike {
             .make_post(url, Some(serde_json::to_value(invoice_request)?))
             .await?;
 
-        Ok(serde_json::from_value(res)?)
+        match serde_json::from_value(res.clone()) {
+            Ok(res) => Ok(res),
+            Err(_) => {
+                log::error!("Api error response on invoice creation");
+                log::error!("{}", res);
+                bail!("Could not create invoice")
+            }
+        }
     }
 
     /// Find Invoice
@@ -79,7 +86,14 @@ impl Strike {
 
         let res = self.make_get(url).await?;
 
-        Ok(serde_json::from_value(res)?)
+        match serde_json::from_value(res.clone()) {
+            Ok(res) => Ok(res),
+            Err(_) => {
+                log::error!("Api error response on find invoice");
+                log::error!("{}", res);
+                bail!("Could not find invoice")
+            }
+        }
     }
 
     /// Invoice quote
@@ -89,6 +103,14 @@ impl Strike {
             .join(&format!("/v1/invoices/{invoice_id}/quote"))?;
 
         let res = self.make_post(url, None).await?;
-        Ok(serde_json::from_value(res)?)
+
+        match serde_json::from_value(res.clone()) {
+            Ok(res) => Ok(res),
+            Err(_) => {
+                log::error!("Api error response on invoice quote");
+                log::error!("{}", res);
+                bail!("Could get invoice quote")
+            }
+        }
     }
 }
