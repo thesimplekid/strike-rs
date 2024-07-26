@@ -4,6 +4,7 @@
 #![warn(missing_docs)]
 #![warn(rustdoc::bare_urls)]
 
+use std::fmt;
 use std::str::FromStr;
 
 use anyhow::{anyhow, bail, Result};
@@ -40,6 +41,16 @@ pub enum Currency {
     EUR,
     /// Bitcoin
     BTC,
+}
+
+impl fmt::Display for Currency {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::USD => write!(f, "USD"),
+            Self::EUR => write!(f, "EUR"),
+            Self::BTC => write!(f, "BTC"),
+        }
+    }
 }
 
 /// Amount with unit
