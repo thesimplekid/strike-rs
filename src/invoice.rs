@@ -102,7 +102,7 @@ impl Strike {
             .base_url
             .join(&format!("/v1/invoices/{invoice_id}/quote"))?;
 
-        let res = self.make_post(url, None).await?;
+        let res = self.make_post(url, None::<String>).await?;
 
         match serde_json::from_value(res.clone()) {
             Ok(res) => Ok(res),

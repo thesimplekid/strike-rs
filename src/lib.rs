@@ -10,7 +10,7 @@ use std::str::FromStr;
 use anyhow::{anyhow, bail, Result};
 use rand::distributions::Alphanumeric;
 use rand::Rng;
-use reqwest::{Client, Url};
+use reqwest::{Client, IntoUrl, Url};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 
@@ -149,7 +149,10 @@ impl Strike {
         })
     }
 
-    async fn make_get(&self, url: Url) -> Result<Value> {
+    async fn make_get<U>(&self, url: U) -> Result<Value>
+    where
+        U: IntoUrl,
+    {
         Ok(self
             .client
             .get(url)
@@ -162,7 +165,11 @@ impl Strike {
             .await?)
     }
 
-    async fn make_post(&self, url: Url, data: Option<Value>) -> Result<Value> {
+    async fn make_post<U, T>(&self, url: U, data: Option<T>) -> Result<Value>
+    where
+        U: IntoUrl,
+        T: Serialize,
+    {
         let value = match data {
             Some(data) => {
                 self.client
@@ -191,7 +198,10 @@ impl Strike {
         Ok(value)
     }
 
-    async fn make_patch(&self, url: Url) -> Result<Value> {
+    async fn make_patch<U>(&self, url: U) -> Result<Value>
+    where
+        U: IntoUrl,
+    {
         Ok(self
             .client
             .patch(url)
@@ -204,7 +214,10 @@ impl Strike {
             .await?)
     }
 
-    async fn make_delete(&self, url: Url) -> Result<()> {
+    async fn make_delete<U>(&self, url: U) -> Result<()>
+    where
+        U: IntoUrl,
+    {
         self.client
             .delete(url)
             .header("Authorization", format!("Bearer {}", self.api_key))
