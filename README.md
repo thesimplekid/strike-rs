@@ -13,7 +13,7 @@
 - [x] Execute LN Payment Quote
 
 ### Webhook
-- [ ] Subscribe to invoice updated webhook
+- [x] Subscribe to invoice updated webhook
 
 ## Minimum Supported Rust Version (MSRV)
 
