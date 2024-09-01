@@ -7,11 +7,11 @@ authors = ["thesimplekid <tsk@thesimplekid.com>"]
 description = "Strike API SDK"
 homepage = "https://github.com/thesimplekid/strike-rs"
 repository = "https://github.com/thesimplekid/strike-rs"
-rust-version = "1.70.0" # MSRV
+rust-version = "1.63.0" # MSRV
 
 [dependencies]
 anyhow = "1"
-axum = "0.7.5"
+axum = "0.6.20"
 reqwest = { version = "0.12", default-features = false, features =  ["json",
     "rustls-tls",
     "rustls-tls-native-roots",
@@ -23,7 +23,10 @@ log = "0.4"
 rand = "0.8.5"
 ring = "0.17.8"
 async-trait = "0.1"
+hyper = "0.14"
 http-body-util = "0.1.0"
+tower = "0.4"
+tower-http = { version = "0.4.0", features = ["map-request-body", "util"] }
 
 [dev-dependencies]
 tokio = { version = "1", features =["rt-multi-thread", "macros", "sync", "time"] }

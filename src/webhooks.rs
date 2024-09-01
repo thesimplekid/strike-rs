@@ -1,8 +1,9 @@
 //! Strike Webhooks
 
 use anyhow::anyhow;
-use axum::body::{to_bytes, Body};
-use axum::extract::{Request, State};
+use axum::body::{self, BoxBody, Full};
+use axum::extract::State;
+use axum::http::request::Request;
 use axum::http::StatusCode;
 use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
@@ -11,6 +12,8 @@ use axum::{Json, Router};
 use ring::hmac::{self, Key};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use tower::ServiceBuilder;
+use tower_http::ServiceBuilderExt;
 
 use crate::{hex, Strike};
 
@@ -69,9 +72,8 @@ impl Strike {
 
         let router = Router::new()
             .route(webhook_endpoint, post(handle_invoice))
-            .layer(middleware::from_fn_with_state(
-                state.clone(),
-                verify_request_body,
+            .layer(ServiceBuilder::new().map_request_body(body::boxed).layer(
+                middleware::from_fn_with_state(state.clone(), verify_request_body),
             ))
             .with_state(state);
 
@@ -123,8 +125,8 @@ impl Strike {
 // middleware to consume the request body upfront
 async fn verify_request_body(
     State(state): State<WebhookState>,
-    request: Request,
-    next: Next,
+    request: Request<BoxBody>,
+    next: Next<BoxBody>,
 ) -> Result<impl IntoResponse, Response> {
     let request = buffer_request_body(request, &state.webhook_secret).await?;
 
@@ -133,12 +135,15 @@ async fn verify_request_body(
 
 // take the request apart, buffer the body,
 // veridy signature, then put the request back together
-async fn buffer_request_body(request: Request, secret: &str) -> Result<Request, Response> {
+async fn buffer_request_body(
+    request: Request<BoxBody>,
+    secret: &str,
+) -> Result<Request<BoxBody>, Response> {
     let (parts, body) = request.into_parts();
 
-    let bytes = to_bytes(body, usize::MAX)
+    let bytes = hyper::body::to_bytes(body)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())?;
+        .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response())?;
 
     let headers = parts.headers.clone();
 
@@ -158,7 +163,7 @@ async fn buffer_request_body(request: Request, secret: &str) -> Result<Request, 
         .map_err(|_| StatusCode::UNAUTHORIZED)
         .into_response();
 
-    Ok(Request::from_parts(parts, Body::from(bytes)))
+    Ok(Request::from_parts(parts, body::boxed(Full::from(bytes))))
 }
 
 /// Webhook data
