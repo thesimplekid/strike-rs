@@ -94,4 +94,20 @@ impl Strike {
             }
         }
     }
+
+    /// Get outgoing payment by payment id
+    pub async fn get_outgoing_payment(&self, payment_id: &str) -> Result<InvoicePaymentResponse> {
+        let url = self.base_url.join(&format!("/v1/payments/{payment_id}"))?;
+
+        let res = self.make_get(url).await?;
+
+        match serde_json::from_value(res.clone()) {
+            Ok(res) => Ok(res),
+            Err(_) => {
+                log::error!("Api error response getting payment quote");
+                log::error!("{}", res);
+                bail!("Could not get payment by id")
+            }
+        }
+    }
 }

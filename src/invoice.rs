@@ -80,8 +80,8 @@ impl Strike {
         }
     }
 
-    /// Find Invoice
-    pub async fn find_invoice(&self, invoice_id: &str) -> Result<InvoiceResponse> {
+    /// Find incoming invoice
+    pub async fn get_incoming_invoice(&self, invoice_id: &str) -> Result<InvoiceResponse> {
         let url = self.base_url.join("/v1/invoices/")?.join(invoice_id)?;
 
         let res = self.make_get(url).await?;
