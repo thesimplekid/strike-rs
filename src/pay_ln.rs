@@ -1,9 +1,10 @@
 //! Pay Ln
 
 use anyhow::{bail, Result};
+use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 
-use crate::{Amount, ConversionRate, Currency, InvoiceState, Strike};
+use crate::{Amount, ConversionRate, Currency, Error, InvoiceState, Strike};
 
 /// Pay Invoice Request
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
@@ -96,17 +97,34 @@ impl Strike {
     }
 
     /// Get outgoing payment by payment id
-    pub async fn get_outgoing_payment(&self, payment_id: &str) -> Result<InvoicePaymentResponse> {
-        let url = self.base_url.join(&format!("/v1/payments/{payment_id}"))?;
+    pub async fn get_outgoing_payment(
+        &self,
+        payment_id: &str,
+    ) -> Result<InvoicePaymentResponse, Error> {
+        let url = self
+            .base_url
+            .join(&format!("/v1/payments/{payment_id}"))
+            .map_err(|_| Error::InvalidUrl)?;
 
-        let res = self.make_get(url).await?;
+        let res = match self.make_get(url).await {
+            Ok(res) => res,
+            Err(err) => {
+                if let Error::ReqwestError(err) = &err {
+                    if err.status().unwrap_or_default() == StatusCode::NOT_FOUND {
+                        return Err(Error::NotFound);
+                    }
+                }
+                return Err(err);
+            }
+        };
 
         match serde_json::from_value(res.clone()) {
             Ok(res) => Ok(res),
-            Err(_) => {
+            Err(err) => {
                 log::error!("Api error response getting payment quote");
                 log::error!("{}", res);
-                bail!("Could not get payment by id")
+
+                Err(err.into())
             }
         }
     }

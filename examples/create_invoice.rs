@@ -19,7 +19,7 @@ async fn main() {
     println!("{:?}", create_invoice);
 
     let invoice = strike
-        .find_invoice(&create_invoice.invoice_id.clone())
+        .get_incoming_invoice(&create_invoice.invoice_id.clone())
         .await
         .unwrap();
     println!("{:?}", invoice);

@@ -7,18 +7,20 @@
 use std::fmt;
 use std::str::FromStr;
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, bail};
 use rand::distributions::Alphanumeric;
 use rand::Rng;
 use reqwest::{Client, IntoUrl, Url};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 
+mod error;
 pub(crate) mod hex;
 pub mod invoice;
 pub mod pay_ln;
 pub mod webhooks;
 
+pub use error::Error;
 pub use invoice::*;
 pub use pay_ln::*;
 
@@ -81,7 +83,7 @@ impl Amount {
     }
 
     /// Unit as sats
-    pub fn to_sats(&self) -> Result<u64> {
+    pub fn to_sats(&self) -> anyhow::Result<u64> {
         match self.currency {
             Currency::BTC => Ok((self.amount * 100_000_000.0) as u64),
             _ => bail!("Unit cannot be converted to sats"),
@@ -128,7 +130,7 @@ impl Strike {
     /// use strike_rs::Strike;
     /// let client = Strike::new("xxxxxxxxxxx", None).unwrap();
     /// ```
-    pub fn new(api_key: &str, api_url: Option<String>) -> Result<Self> {
+    pub fn new(api_key: &str, api_url: Option<String>) -> anyhow::Result<Self> {
         let base_url = match api_url {
             Some(url) => Url::from_str(&url)?,
             None => Url::from_str("https://api.strike.me")?,
@@ -149,23 +151,26 @@ impl Strike {
         })
     }
 
-    async fn make_get<U>(&self, url: U) -> Result<Value>
+    async fn make_get<U>(&self, url: U) -> Result<Value, Error>
     where
         U: IntoUrl,
     {
-        Ok(self
+        let res = self
             .client
             .get(url)
             .header("Authorization", format!("Bearer {}", self.api_key))
             .header("Content-Type", "application/json")
             .header("accept", "application/json")
             .send()
-            .await?
-            .json::<Value>()
-            .await?)
+            .await;
+
+        match res {
+            Ok(res) => Ok(res.json::<Value>().await.unwrap_or_default()),
+            Err(err) => Err(err.into()),
+        }
     }
 
-    async fn make_post<U, T>(&self, url: U, data: Option<T>) -> Result<Value>
+    async fn make_post<U, T>(&self, url: U, data: Option<T>) -> anyhow::Result<Value>
     where
         U: IntoUrl,
         T: Serialize,
@@ -198,7 +203,7 @@ impl Strike {
         Ok(value)
     }
 
-    async fn make_patch<U>(&self, url: U) -> Result<Value>
+    async fn make_patch<U>(&self, url: U) -> anyhow::Result<Value>
     where
         U: IntoUrl,
     {
@@ -214,7 +219,7 @@ impl Strike {
             .await?)
     }
 
-    async fn make_delete<U>(&self, url: U) -> Result<()>
+    async fn make_delete<U>(&self, url: U) -> anyhow::Result<()>
     where
         U: IntoUrl,
     {
