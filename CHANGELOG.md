@@ -21,7 +21,7 @@
 
 -->
 
-## [Unreleased]
+## [0.4.0]
 ### Changed
 - Description in payment quote is an option ([thesimplekid]).
 
