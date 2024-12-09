@@ -14,6 +14,31 @@ pub struct PayInvoiceQuoteRequest {
     pub ln_invoice: String,
     /// Source Currency
     pub source_currency: Currency,
+    /// Amount
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub amount: Option<RequestAmount>,
+}
+
+/// Request amount
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RequestAmount {
+    /// Amount
+    pub amount: f32,
+    /// Currency
+    pub currency: Currency,
+    /// Fee Policy
+    pub fee_policy: FeePolicy,
+}
+
+/// Fee Policy
+#[derive(Debug, Clone, Hash, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "UPPERCASE")]
+pub enum FeePolicy {
+    /// Fee should be included in the amount
+    Inclusive,
+    /// Fee should be added on top
+    Exclusive,
 }
 
 /// Pay Invoice Response
