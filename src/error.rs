@@ -12,7 +12,7 @@ pub enum Error {
     /// From reqwest error
     #[error(transparent)]
     ReqwestError(#[from] reqwest::Error),
-    /// From reqwest error
+    /// From serde error
     #[error(transparent)]
     SerdeError(#[from] serde_json::Error),
 }
